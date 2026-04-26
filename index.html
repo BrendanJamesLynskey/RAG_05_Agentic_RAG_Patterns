@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 05 — Agentic RAG Patterns</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-card: #0d1117;
+            --bg-code: #161b22;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #76B900;
+            --accent-dim: #76B90044;
+            --accent-glow: #76B90033;
+            --border: #21262d;
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --font-body: 'Inter', sans-serif;
+            --max-width: 900px;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .hero > * { position: relative; z-index: 1; }
+        .series-label {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+        .hero h1 .accent { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin-bottom: 2rem;
+        }
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+        }
+        .tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            background: var(--accent-dim);
+            white-space: nowrap;
+        }
+        .pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            margin-bottom: 1rem;
+            max-width: var(--max-width);
+        }
+        .pipeline-step {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.3rem 0.7rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .pipeline-arrow { color: var(--accent); font-size: 0.9rem; font-weight: 700; }
+        .slide {
+            min-height: 100vh;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 4rem 1.5rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .slide-number {
+            font-family: var(--font-display);
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-dim);
+            position: absolute;
+            top: 2rem;
+            right: 1.5rem;
+            line-height: 1;
+            user-select: none;
+        }
+        .slide h2 {
+            font-family: var(--font-display);
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            line-height: 1.25;
+        }
+        .slide h3 {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .slide p { margin-bottom: 1rem; color: var(--text-secondary); }
+        .slide p strong { color: var(--text-primary); }
+        .slide ul, .slide ol { margin-bottom: 1rem; padding-left: 1.5rem; color: var(--text-secondary); }
+        .slide li { margin-bottom: 0.4rem; }
+        .slide li strong { color: var(--text-primary); }
+        .slide code {
+            font-family: var(--font-mono);
+            font-size: 0.88em;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+            color: #c9d1d9;
+        }
+        .code-block {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.25rem 0;
+            overflow: hidden;
+        }
+        .code-header {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(118, 185, 0, 0.08);
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .code-block pre { margin: 0; padding: 1rem; overflow-x: auto; }
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #c9d1d9;
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+        .kw { color: #ff7b72; }
+        .fn { color: #d2a8ff; }
+        .str { color: #a5d6ff; }
+        .cm { color: #8b949e; font-style: italic; }
+        .num { color: #79c0ff; }
+        .type { color: #ffa657; }
+        .dir { color: #ff7b72; }
+        .mac { color: #ffa657; }
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th {
+            background: var(--bg-code);
+            color: var(--accent);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-display);
+            white-space: nowrap;
+        }
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:nth-child(even) td { background: rgba(13, 17, 23, 0.5); }
+        .diagram-flow {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-box {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            text-align: center;
+            white-space: nowrap;
+        }
+        .diagram-box.accent { border-color: var(--accent); color: var(--accent); background: rgba(118, 185, 0, 0.08); }
+        .diagram-box.dim { color: var(--text-secondary); border-color: var(--border); }
+        .diagram-arrow { color: var(--accent); font-size: 1.3rem; font-weight: 700; }
+        .diagram-vertical {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-vertical .diagram-arrow { font-size: 1.1rem; }
+        .hierarchy {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .hierarchy-level { display: flex; align-items: center; gap: 0.75rem; }
+        .hierarchy-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 80px;
+            text-align: right;
+        }
+        .hierarchy-items { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+        .hierarchy-item {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .hierarchy-item.accent { border-color: var(--accent); color: var(--accent); background: rgba(118, 185, 0, 0.08); }
+        .diagram-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+        .diagram-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .diagram-panel {
+            padding: 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .diagram-panel.accent-border { border-left: 3px solid var(--accent); }
+        .diagram-panel h4 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+        .diagram-panel p, .diagram-panel ul { font-size: 0.85rem; }
+        .callout {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+        }
+        .callout p { margin-bottom: 0; }
+        .callout p + p { margin-top: 0.5rem; }
+        .callout .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+        }
+        .contents-list { list-style: none; padding-left: 0; counter-reset: contents; }
+        .contents-list li {
+            counter-increment: contents;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .contents-list li:last-child { border-bottom: none; }
+        .contents-list li::before {
+            content: counter(contents, decimal-leading-zero);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 2rem;
+        }
+        .contents-list a { color: var(--text-primary); text-decoration: none; transition: color 0.2s; }
+        .contents-list a:hover { color: var(--accent); }
+        .footer {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+        .footer a { color: var(--accent); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .canvas-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.25rem 0;
+            overflow-x: auto;
+        }
+        .canvas-wrap canvas, .canvas-wrap svg { display: block; margin: 0 auto; max-width: 100%; }
+        .badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: middle;
+            margin-left: 0.3rem;
+        }
+        .badge.ok    { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .badge.warn  { border-color: #ffa657; color: #ffa657; background: rgba(255,166,87,0.08); }
+        .badge.bad   { border-color: #ff7b72; color: #ff7b72; background: rgba(255,123,114,0.08); }
+        @media (max-width: 640px) {
+            .slide { padding: 3rem 1rem; min-height: auto; }
+            .slide-number { font-size: 3rem; top: 1.5rem; right: 1rem; }
+            .slide h2 { font-size: 1.5rem; }
+            .diagram-grid.cols-2, .diagram-grid.cols-3 { grid-template-columns: 1fr; }
+            .pipeline { gap: 0.15rem; }
+            .pipeline-step { font-size: 0.6rem; padding: 0.2rem 0.4rem; }
+            .hero h1 { font-size: 1.8rem; }
+            table { font-size: 0.78rem; }
+        }
+    </style>
+</head>
+<body>
+<header class="hero">
+    <div class="series-label">RAG &amp; Retrieval Systems Series &mdash; Presentation 05</div>
+    <h1>Agentic RAG Patterns &mdash; <span class="accent">From Single-Shot to Multi-Step</span></h1>
+    <p class="subtitle">HyDE, query decomposition, Self-RAG, CRAG, iterative retrieval, query routing, and tool-using RAG with code and web.</p>
+    <div class="tags">
+        <span class="tag">HyDE</span>
+        <span class="tag">Self-RAG</span>
+        <span class="tag">CRAG</span>
+        <span class="tag">Query Decomposition</span>
+        <span class="tag">Iterative Retrieval</span>
+        <span class="tag">Query Routing</span>
+        <span class="tag">Tool-Using RAG</span>
+    </div>
+    <div class="pipeline">
+        <span class="pipeline-step">Query</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Route / Decompose</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">HyDE / Rewrite</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Retrieve</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Grade</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Re-retrieve?</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Generate</span>
+    </div>
+</header>
+
+<section class="slide" id="slide-00">
+    <div class="slide-number">00</div>
+    <h2>Topics We'll Cover</h2>
+    <ul class="contents-list">
+        <li><a href="#slide-01">From Single-Shot to Multi-Step Retrieval</a></li>
+        <li><a href="#slide-02">HyDE &mdash; Hypothetical Document Embeddings</a></li>
+        <li><a href="#slide-03">Query Decomposition for Compound Questions</a></li>
+        <li><a href="#slide-04">Self-RAG &mdash; Training the Model to Decide When to Retrieve</a></li>
+        <li><a href="#slide-05">Corrective RAG (CRAG) &mdash; Quality Classifier + Fallback</a></li>
+        <li><a href="#slide-06">Iterative Retrieval Loops</a></li>
+        <li><a href="#slide-07">Query Routing &mdash; Which Index for Which Question</a></li>
+        <li><a href="#slide-08">Tool-Using RAG &mdash; Retrieval + Code + Web</a></li>
+        <li><a href="#slide-09">What to Take Away</a></li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-01">
+    <div class="slide-number">01</div>
+    <h2>From Single-Shot to Multi-Step Retrieval</h2>
+    <p>Naive RAG is a single-pass pipeline: embed query &rarr; retrieve top-k &rarr; stuff into context &rarr; generate. This fails for <strong>compound questions</strong> (multiple sub-questions needing separate retrievals), <strong>ambiguous queries</strong> (query expansion helps), and <strong>unreliable corpora</strong> (retrieved docs may be irrelevant or outdated).</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Naive RAG failure modes</h4>
+            <ul>
+                <li><em>"Compare the architecture of GPT-4 and Llama-3"</em> &rarr; single embedding averages both &rarr; poor recall on either</li>
+                <li><em>"What was Apple's revenue in Q3 2025?"</em> &rarr; corpus is 2023 vintage &rarr; retrieves stale data; no hallucination warning</li>
+                <li><em>"How does X work?"</em> on a sparse corpus &rarr; top-k docs are marginally relevant &rarr; LLM hallucinates with apparent confidence</li>
+            </ul>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Agentic RAG capabilities</h4>
+            <ul>
+                <li>Decide <em>whether</em> to retrieve at all (Self-RAG)</li>
+                <li>Decompose a compound question into sub-queries, retrieve separately, merge answers</li>
+                <li>Grade retrieved docs and fall back to web search if quality is low (CRAG)</li>
+                <li>Iterate retrieval when the first pass was insufficient</li>
+                <li>Route different query types to the best index or tool</li>
+            </ul>
+        </div>
+    </div>
+    <div class="callout">
+        <div class="callout-label">Complexity budget</div>
+        <p>Agentic patterns add latency and cost. Every additional LLM call adds 200&ndash;600 ms and ~0.5&ndash;2 k tokens. Design the loop so the &ldquo;happy path&rdquo; (good retrieval first try) is fast. Reserve multi-step patterns for queries that actually need them &mdash; query classification at the entry point lets you route simple queries to single-pass RAG and complex ones to the agentic loop.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-02">
+    <div class="slide-number">02</div>
+    <h2>HyDE &mdash; Hypothetical Document Embeddings</h2>
+    <p><strong>HyDE</strong> (Gao et al. 2022) addresses the <em>query&ndash;document embedding gap</em>: a short question and a long passage have very different embedding distributions even when semantically aligned. The fix: use an LLM to generate a hypothetical answer document, then embed <em>that</em> for retrieval.</p>
+    <div class="diagram-flow">
+        <div class="diagram-box">User query<br><small>"What causes transformer vanishing gradients?"</small></div>
+        <div class="diagram-arrow">&rarr;</div>
+        <div class="diagram-box accent">LLM generates<br>hypothetical doc<br><small>(~150 tokens)</small></div>
+        <div class="diagram-arrow">&rarr;</div>
+        <div class="diagram-box">Embed<br>hypothetical doc</div>
+        <div class="diagram-arrow">&rarr;</div>
+        <div class="diagram-box accent">ANN search<br>in corpus</div>
+        <div class="diagram-arrow">&rarr;</div>
+        <div class="diagram-box">Rerank + generate</div>
+    </div>
+    <div class="code-block">
+        <div class="code-header">HyDE with OpenAI + sentence-transformers</div>
+<pre><code><span class="kw">from</span> openai <span class="kw">import</span> OpenAI
+<span class="kw">from</span> sentence_transformers <span class="kw">import</span> SentenceTransformer
+
+llm = <span class="fn">OpenAI</span>()
+embedder = <span class="fn">SentenceTransformer</span>(<span class="str">"BAAI/bge-large-en-v1.5"</span>)
+
+<span class="kw">def</span> <span class="fn">hyde_retrieve</span>(query: <span class="type">str</span>, k: <span class="type">int</span> = <span class="num">10</span>) -> <span class="type">list</span>:
+    <span class="cm"># 1. Generate hypothetical answer</span>
+    hyp = llm.chat.completions.<span class="fn">create</span>(
+        model=<span class="str">"gpt-4o-mini"</span>,
+        messages=[{<span class="str">"role"</span>: <span class="str">"user"</span>,
+                   <span class="str">"content"</span>: <span class="fn">f</span><span class="str">"Write a 100-word technical answer to: {query}"</span>}],
+        max_tokens=<span class="num">150</span>,
+    ).choices[<span class="num">0</span>].message.content
+
+    <span class="cm"># 2. Embed the hypothetical answer (not the query!)</span>
+    vec = embedder.<span class="fn">encode</span>(hyp, normalize_embeddings=<span class="kw">True</span>)
+
+    <span class="cm"># 3. Retrieve against corpus</span>
+    <span class="kw">return</span> vector_db.<span class="fn">search</span>(vec, limit=k)</code></pre>
+    </div>
+    <div class="callout">
+        <div class="callout-label">HyDE gains and limitations</div>
+        <p>On BEIR benchmarks, HyDE improves NDCG@10 by 5&ndash;15% over direct embedding of the query, especially for short keyword queries. It fails when the LLM hallucinates a factually incorrect hypothetical &mdash; the embedding then points to plausible-sounding but wrong documents. Mitigate by running HyDE in parallel with direct-query retrieval and using RRF to fuse both lists.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-03">
+    <div class="slide-number">03</div>
+    <h2>Query Decomposition for Compound Questions</h2>
+    <p>Compound questions contain multiple independent sub-questions that each require separate retrieval. Embedding the full compound question produces an averaged vector that may not retrieve well for any single sub-question.</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Sequential decomposition</h4>
+            <p>Generate sub-queries one at a time; each may depend on the answer to the previous (step-back decomposition). Useful for multi-hop questions: <em>"Who founded the company that acquired Slack?"</em> &rarr; Q1: "Who founded Salesforce?" &rarr; Q2: "Did Salesforce acquire Slack?"</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Parallel decomposition</h4>
+            <p>Generate all sub-queries at once; retrieve independently; merge results before generation. Faster but sub-queries can't depend on each other. Good for multi-facet questions: <em>"Compare X and Y on dimensions A, B, C."</em> &rarr; retrieve A(X), A(Y), B(X), B(Y), C(X), C(Y) in parallel.</p>
+        </div>
+    </div>
+    <div class="code-block">
+        <div class="code-header">LangChain multi-query retriever (parallel decomposition)</div>
+<pre><code><span class="kw">from</span> langchain.retrievers.multi_query <span class="kw">import</span> MultiQueryRetriever
+<span class="kw">from</span> langchain_openai <span class="kw">import</span> ChatOpenAI
+
+llm = <span class="fn">ChatOpenAI</span>(model=<span class="str">"gpt-4o-mini"</span>, temperature=<span class="num">0</span>)
+retriever = MultiQueryRetriever.<span class="fn">from_llm</span>(
+    retriever=vector_store.<span class="fn">as_retriever</span>(search_kwargs={<span class="str">"k"</span>: <span class="num">5</span>}),
+    llm=llm,
+    <span class="cm"># Generates 3 alternative phrasings + the original</span>
+)
+
+<span class="cm"># Retrieves for all generated queries, deduplicates, returns union</span>
+docs = retriever.<span class="fn">invoke</span>(<span class="str">"What are the limitations of RLHF for alignment?"</span>)</code></pre>
+    </div>
+    <div class="callout">
+        <div class="callout-label">Step-back prompting</div>
+        <p><strong>Step-back prompting</strong> (Zheng et al. 2023) is a related technique: before decomposing, ask the model for the more general &ldquo;step-back&rdquo; question that encompasses the specific query. Embed both the specific and the step-back question; retrieve for both; fuse. This improves recall for highly specific queries by also retrieving background context. Effective for technical documentation RAG where specific questions need conceptual background.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-04">
+    <div class="slide-number">04</div>
+    <h2>Self-RAG &mdash; Training the Model to Decide When to Retrieve</h2>
+    <p><strong>Self-RAG</strong> (Asai et al. 2023) fine-tunes a model to emit special <em>reflection tokens</em> that control retrieval dynamically. Unlike pipeline-controlled retrieval, the model itself decides whether retrieval is needed, whether retrieved docs are relevant, and whether its own output is grounded.</p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Token type</th><th>Token</th><th>Meaning</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Retrieve</strong></td><td><code>[Retrieve]</code> / <code>[No Retrieve]</code></td><td>Should retrieval be triggered for this generation step?</td></tr>
+                <tr><td><strong>IsREL</strong></td><td><code>[Relevant]</code> / <code>[Irrelevant]</code></td><td>Is the retrieved passage relevant to the query?</td></tr>
+                <tr><td><strong>IsSUP</strong></td><td><code>[Fully supported]</code> / <code>[Partially supported]</code> / <code>[No support]</code></td><td>Is the generated claim supported by the retrieved passage?</td></tr>
+                <tr><td><strong>IsUSE</strong></td><td><code>[Utility:1&ndash;5]</code></td><td>How useful is the overall response? Used for beam-search scoring.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="callout">
+        <div class="callout-label">Self-RAG vs pipeline RAG &mdash; when to choose each</div>
+        <p><strong>Self-RAG requires a fine-tuned model.</strong> The original paper fine-tuned Llama-2-7B and 13B; Llama-3 variants exist on HuggingFace. If you're using a proprietary API (Claude, GPT-4), you cannot use Self-RAG directly &mdash; you must approximate it with a separate LLM classifier or use pipeline-controlled retrieval (CRAG). Self-RAG is most valuable when retrieval is expensive (large corpus, high reranker cost) and most queries don't need it. On knowledge-heavy tasks, Self-RAG with Llama-2-13B matches or beats GPT-3.5 + vanilla RAG.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-05">
+    <div class="slide-number">05</div>
+    <h2>Corrective RAG (CRAG) &mdash; Quality Classifier + Fallback</h2>
+    <p><strong>CRAG</strong> (Yan et al. 2024) adds a retrieval-quality classifier between the retrieval stage and the generation stage. If retrieved documents are classified as low-quality or irrelevant, the system falls back to a web-search augmented retrieval pass.</p>
+    <div class="diagram-vertical">
+        <div class="diagram-box accent">Query &rarr; First-stage retrieval (vector DB)</div>
+        <div class="diagram-arrow">&darr;</div>
+        <div class="diagram-box">Relevance classifier (cross-encoder or LLM-as-judge)<br><small>Each retrieved doc scored: {Correct, Incorrect, Ambiguous}</small></div>
+        <div class="diagram-arrow">&darr;</div>
+        <div class="diagram-box accent">Decision: &ge;1 Correct? &rarr; proceed &nbsp;|&nbsp; All Incorrect? &rarr; web search &nbsp;|&nbsp; Mixed? &rarr; both</div>
+        <div class="diagram-arrow">&darr;</div>
+        <div class="diagram-box">Web search retrieval (Tavily, Bing API, SerpAPI)<br><small>Strip and reformat web results into passages</small></div>
+        <div class="diagram-arrow">&darr;</div>
+        <div class="diagram-box accent">Generate answer from corpus + web passages</div>
+    </div>
+    <div class="callout">
+        <div class="callout-label">LangGraph CRAG implementation</div>
+        <p>LangGraph (LangChain's agent orchestration framework) has a canonical CRAG tutorial. The graph has nodes: <code>retrieve</code>, <code>grade_documents</code>, <code>transform_query</code>, <code>web_search</code>, <code>generate</code>. Conditional edges route based on the grader's output. The relevance grader is typically a zero-shot GPT-4o-mini call with a binary yes/no schema (structured output). The web search node uses Tavily's <code>TavilySearchResults</code> tool. Full CRAG adds ~400&ndash;800 ms to the happy path but prevents the model from confabulating when the corpus is stale.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-06">
+    <div class="slide-number">06</div>
+    <h2>Iterative Retrieval Loops</h2>
+    <p>Some questions cannot be answered from a single retrieval pass because the answer requires synthesising information across multiple documents, or because the initial query is underspecified and needs refinement based on what was found.</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Retrieve-Read-Retrieve (RRR)</h4>
+            <p>Retrieve an initial set of documents. Read them to identify what information is still missing. Formulate a second retrieval query targeting the gaps. Repeat until the model declares the context sufficient or a step limit is reached. Effective for multi-hop reasoning tasks (HotpotQA, MuSiQue). Maximum 2&ndash;3 iterations in production to contain latency.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>IRCoT (Interleaved Retrieval &amp; Chain of Thought)</h4>
+            <p>Interleave chain-of-thought generation with retrieval: generate one reasoning step, retrieve a passage relevant to that step, continue generating the next step conditioned on the retrieved passage. Achieves state-of-the-art on 2WikiMultiHopQA. Cost: O(reasoning_steps) LLM calls + O(reasoning_steps) retrieval passes. Suitable only when answer quality outweighs latency.</p>
+        </div>
+    </div>
+    <div class="callout">
+        <div class="callout-label">Preventing infinite loops</div>
+        <p>Always enforce a <strong>maximum iteration count</strong> (typically 3) and a <strong>redundancy check</strong>: if the current retrieval query is semantically close to a previous one (cosine similarity &gt; 0.95 of their embeddings), skip retrieval and proceed to generation. LangGraph <code>add_conditional_edges</code> with a counter check is the standard implementation pattern. Without these guards, an agentic loop on a poorly-populated corpus can call the LLM and retriever indefinitely.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-07">
+    <div class="slide-number">07</div>
+    <h2>Query Routing &mdash; Which Index for Which Question</h2>
+    <p>A production RAG system may have multiple indexes: a dense vector index for prose, a BM25 index for code, a structured SQL database for factual lookups, and a web search tool for current events. Query routing selects the best retrieval path without trying all of them on every query.</p>
+    <div class="hierarchy">
+        <div class="hierarchy-level">
+            <div class="hierarchy-label">Router types</div>
+            <div class="hierarchy-items">
+                <div class="hierarchy-item accent">LLM router (zero-shot)</div>
+                <div class="hierarchy-item accent">Embedding classifier</div>
+                <div class="hierarchy-item">Rule-based (regex, keyword)</div>
+                <div class="hierarchy-item">Trained classifier (logistic regression)</div>
+            </div>
+        </div>
+        <div class="hierarchy-level">
+            <div class="hierarchy-label">Destinations</div>
+            <div class="hierarchy-items">
+                <div class="hierarchy-item accent">Internal vector DB</div>
+                <div class="hierarchy-item accent">Code index (CodeBERT)</div>
+                <div class="hierarchy-item accent">SQL / structured DB</div>
+                <div class="hierarchy-item">Web search (Tavily)</div>
+                <div class="hierarchy-item">Direct LLM (no retrieval)</div>
+                <div class="hierarchy-item">Calendar / API tool</div>
+            </div>
+        </div>
+    </div>
+    <div class="code-block">
+        <div class="code-header">LlamaIndex semantic router (embedding-based)</div>
+<pre><code><span class="kw">from</span> llama_index.core.selectors <span class="kw">import</span> LLMSingleSelector
+<span class="kw">from</span> llama_index.core.tools <span class="kw">import</span> ToolMetadata
+
+selector = <span class="fn">LLMSingleSelector</span>.<span class="fn">from_defaults</span>()
+
+choices = [
+    <span class="fn">ToolMetadata</span>(description=<span class="str">"technical documentation"</span>, name=<span class="str">"docs"</span>),
+    <span class="fn">ToolMetadata</span>(description=<span class="str">"source code repository"</span>,     name=<span class="str">"code"</span>),
+    <span class="fn">ToolMetadata</span>(description=<span class="str">"current news and web"</span>,         name=<span class="str">"web"</span>),
+]
+
+result = selector.<span class="fn">select</span>(choices, query=<span class="str">"How do I fix NullPointerException in Java 21 records?"</span>)
+<span class="cm"># Returns: SelectionOutput(index=1, reason="code-related query")</span></code></pre>
+    </div>
+</section>
+
+<section class="slide" id="slide-08">
+    <div class="slide-number">08</div>
+    <h2>Tool-Using RAG &mdash; Retrieval + Code + Web</h2>
+    <p>The most capable production RAG systems combine vector retrieval with other tools: code execution for numerical reasoning, web search for current events, SQL for structured data, and external APIs for live lookups. The model orchestrates which tools to call and in what order.</p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Tool</th><th>Purpose in RAG</th><th>Library/API</th><th>Output type</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Vector retrieval</strong></td><td>Semantic document lookup</td><td>Qdrant, pgvector, Weaviate</td><td>Ranked passage list</td></tr>
+                <tr><td><strong>BM25 / keyword</strong></td><td>Exact-match fallback</td><td>Elasticsearch, BM25s Python lib</td><td>Ranked passage list</td></tr>
+                <tr><td><strong>Web search</strong></td><td>Current events, out-of-corpus queries</td><td>Tavily, Bing Search API, SerpAPI</td><td>Snippets + URLs</td></tr>
+                <tr><td><strong>Code interpreter</strong></td><td>Numerical calculations, data transformation</td><td>Claude Code, OpenAI Code Interpreter</td><td>Execution result + stdout</td></tr>
+                <tr><td><strong>SQL / text-to-SQL</strong></td><td>Structured factual lookups over tables</td><td>LangChain SQLDatabaseChain, vanna.ai</td><td>Tabular data</td></tr>
+                <tr><td><strong>Citation lookup</strong></td><td>Resolve DOI/arXiv IDs to abstract text</td><td>Semantic Scholar API, CrossRef API</td><td>Paper metadata + abstract</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="callout">
+        <div class="callout-label">ReAct + retrieval pattern</div>
+        <p><strong>ReAct</strong> (Yao et al. 2022) interleaves reasoning (Thought) with action (Act) traces. For RAG, the model emits: <em>Thought: I need to find the release date of GPT-4. Action: retrieval("GPT-4 release date"). Observation: GPT-4 was released March 2023. Thought: Now I can answer.</em> This gives an auditable trace of retrieval decisions. LangChain's <code>create_react_agent</code> and LlamaIndex's <code>ReActAgent</code> both implement this. Claude and GPT-4-class models perform ReAct natively without fine-tuning.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-09">
+    <div class="slide-number">09</div>
+    <h2>What to Take Away</h2>
+    <ul>
+        <li><strong>HyDE closes the query&ndash;document gap</strong> by 5&ndash;15 NDCG points for short queries. Run it in parallel with direct-query retrieval and fuse with RRF to hedge against LLM hallucination in the hypothetical.</li>
+        <li><strong>Query decomposition</strong> is essential for compound questions. Parallel for multi-facet queries; sequential for multi-hop questions where each answer feeds the next query.</li>
+        <li><strong>Self-RAG</strong> requires a fine-tuned model but lets the model control retrieval dynamically. For proprietary LLMs, approximate with a separate relevance-grading step (CRAG).</li>
+        <li><strong>CRAG</strong> prevents hallucination on stale-corpus queries by grading retrieved docs and falling back to web search when all docs are irrelevant.</li>
+        <li><strong>Iterative retrieval</strong>: cap at 2&ndash;3 iterations; always check for query redundancy before another retrieval pass.</li>
+        <li><strong>Query routing</strong> reduces latency and cost by directing simple queries to fast paths and complex queries to expensive ones. An embedding classifier is faster than an LLM router for high-traffic applications.</li>
+        <li><strong>Tool-using RAG</strong> (ReAct + retrieval + code + web) is the current state of the art for general-purpose QA agents.</li>
+    </ul>
+    <div class="callout">
+        <div class="callout-label">Where to next</div>
+        <p>Deck 06 covers GraphRAG and knowledge graphs: Microsoft GraphRAG communities, KG construction, property graphs (Neo4j, Memgraph, KuzuDB), hybrid graph + vector retrieval, and Cypher in agent loops.</p>
+    </div>
+</section>
+
+<footer class="footer">
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_RAG_Retrieval">RAG &amp; Retrieval Systems Series</a></p>
+    <p style="margin-top:0.5rem;font-size:0.8rem;"><a href="https://github.com/BrendanJamesLynskey/LLM_Hub_RAG_Retrieval">Back to Series Index</a></p>
+</footer>
+<script>
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.slide').forEach(slide => {
+        slide.style.opacity = '0';
+        slide.style.transform = 'translateY(30px)';
+        slide.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(slide);
+    });
+</script>
+</body>
+</html>
